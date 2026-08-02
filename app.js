@@ -3,7 +3,7 @@
 // Local Storage Keys
 const KEYS = {
   SCRIPT_URL: 'komorebi_script_url',
-  GEMINI_KEY: 'komorebi_gemini_api_key',
+  CLAUDE_KEY: 'komorebi_claude_api_key',
   PROFILE: 'komorebi_profile',
   LOGS: 'komorebi_local_logs',
   FOOD_DB: 'komorebi_local_db',
@@ -1871,7 +1871,7 @@ const state = {
   foodDatabase: [],
   logs: [],
   scriptUrl: '',
-  geminiApiKey: '',
+  claudeApiKey: '',
   selectedFoodForLogging: null,
   isManualNutrientEdit: false,
   calendarYear: new Date().getFullYear(),
@@ -1929,10 +1929,10 @@ function loadLocalState() {
     updateSyncIndicator(false);
   }
 
-  const geminiKey = localStorage.getItem(KEYS.GEMINI_KEY);
-  if (geminiKey) {
-    state.geminiApiKey = geminiKey;
-    document.getElementById('gemini-api-key').value = geminiKey;
+  const claudeKey = localStorage.getItem(KEYS.CLAUDE_KEY);
+  if (claudeKey) {
+    state.claudeApiKey = claudeKey;
+    document.getElementById('claude-api-key').value = claudeKey;
   }
 
   const savedProfile = localStorage.getItem(KEYS.PROFILE);
@@ -2802,7 +2802,8 @@ function getMultiplier(food, amount, selectedUnit) {
 }
 
 function selectFoodForLogging(food) {
-  state.selectedFoodForLogging = food;
+  // Clone so editing the in-progress log entry never mutates the shared food database object
+  state.selectedFoodForLogging = { ...food };
   
   const searchInput = document.getElementById('food-search-input');
   const amountInput = document.getElementById('food-amount-input');
@@ -2890,8 +2891,9 @@ function buildQuickAddChip(food) {
 
 // Set up UI states for manual overrides vs read-only display labels
 function setManualNutrientEditMode(isEdit) {
+  const wasEditing = state.isManualNutrientEdit;
   state.isManualNutrientEdit = isEdit;
-  
+
   const toggleBtn = document.getElementById('edit-nutrients-toggle-btn');
   toggleBtn.textContent = isEdit ? "Lock & Calculate" : "Edit Manually";
 
@@ -2911,7 +2913,7 @@ function setManualNutrientEditMode(isEdit) {
     }
   });
 
-  if (!isEdit) {
+  if (!isEdit && wasEditing) {
     // Lock values: sync input numbers back into preview state
     if (state.selectedFoodForLogging) {
       // Calculate what values should be per 100g/ml or pcs based on quantity entered
@@ -3089,83 +3091,86 @@ function updateNutritionLogPreview() {
   }
 }
 
-// Fetch nutrient estimations using the Gemini AI endpoint directly
-async function fetchGeminiEstimate(query) {
-  if (!state.geminiApiKey) {
-    alert("Please enter a Gemini API Key in the Sync Settings drawer to enable AI nutrition estimation.");
+// Fetch nutrient estimations using the Claude API directly from the browser
+async function fetchClaudeEstimate(query) {
+  if (!state.claudeApiKey) {
+    alert("Please enter a Claude API Key in the Sync Settings drawer to enable AI nutrition estimation.");
     document.getElementById('sync-drawer-overlay').classList.add('open');
     return;
   }
 
   showLoader(`AI is estimating "${query}"...`);
 
-  const systemInstruction = `You are a clinical nutritionist. Given a food description, analyze it and estimate its nutritional values. Output ONLY a valid JSON object matching this exact structure, no markdown wrappers, no other text:
-{
-  "name": "Clean name of food (capitalized, e.g. Golden Kiwi)",
-  "category": "Custom",
-  "calories": 0,          // kcal (normalized: per 100g for 'g', per 100ml for 'ml', or per 1 piece for 'pcs')
-  "protein": 0.0,         // grams (per 100g/ml or per 1 piece)
-  "carbs": 0.0,           // grams (per 100g/ml or per 1 piece)
-  "fat": 0.0,             // grams (per 100g/ml or per 1 piece)
-  "vitA": 0,              // mcg RAE (per 100g/ml or per 1 piece)
-  "iron": 0.0,            // mg (per 100g/ml or per 1 piece)
-  "vitD": 0.0,            // mcg (per 100g/ml or per 1 piece)
-  "calcium": 0,           // mg (per 100g/ml or per 1 piece)
-  "potassium": 0,         // mg (per 100g/ml or per 1 piece)
-  "magnesium": 0,         // mg (per 100g/ml or per 1 piece)
-  "vitB12": 0.0,          // mcg (per 100g/ml or per 1 piece)
-  "folate": 0,            // mcg (per 100g/ml or per 1 piece)
-  "defaultServing": 100,  // typical serving size number (e.g. 100 for grams, 1 for pcs)
-  "unit": "g"             // unit string, must be exactly "g", "ml", or "pcs"
-}`;
+  const systemInstruction = "You are a clinical nutritionist. Given a food description, estimate its nutritional values, normalized per 100g for unit 'g', per 100ml for unit 'ml', or per 1 piece for unit 'pcs'.";
+
+  const nutrientSchema = {
+    type: "object",
+    properties: {
+      name: { type: "string", description: "Clean, capitalized name of the food, e.g. Golden Kiwi" },
+      category: { type: "string" },
+      calories: { type: "number" },
+      protein: { type: "number" },
+      carbs: { type: "number" },
+      fat: { type: "number" },
+      vitA: { type: "number" },
+      iron: { type: "number" },
+      vitD: { type: "number" },
+      calcium: { type: "number" },
+      potassium: { type: "number" },
+      magnesium: { type: "number" },
+      vitB12: { type: "number" },
+      folate: { type: "number" },
+      defaultServing: { type: "number", description: "Typical serving size number, e.g. 100 for grams, 1 for pcs" },
+      unit: { type: "string", enum: ["g", "ml", "pcs"] }
+    },
+    required: ["name", "category", "calories", "protein", "carbs", "fat", "vitA", "iron", "vitD", "calcium", "potassium", "magnesium", "vitB12", "folate", "defaultServing", "unit"],
+    additionalProperties: false
+  };
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${state.geminiApiKey}`, {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "x-api-key": state.claudeApiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
       },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: systemInstruction },
-            { text: `Analyze this food entry: "${query}"` }
-          ]
-        }]
+        model: "claude-haiku-4-5",
+        max_tokens: 1024,
+        system: systemInstruction,
+        messages: [{ role: "user", content: `Analyze this food entry: "${query}"` }],
+        output_config: { format: { type: "json_schema", schema: nutrientSchema } }
       })
     });
 
-    if (!response.ok) {
-      throw new Error(`API response error HTTP ${response.status}`);
-    }
-
     const json = await response.json();
-    let text = json.candidates[0].content.parts[0].text.trim();
-    
-    // Robustly strip markdown code blocks if present
-    if (text.includes("```")) {
-      text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+
+    if (!response.ok) {
+      throw new Error(json?.error?.message || `API response error HTTP ${response.status}`);
     }
 
-    const estimatedFood = JSON.parse(text);
-    
-    if (!estimatedFood.name || typeof estimatedFood.calories !== 'number') {
-      throw new Error("Parsed object is missing required fields.");
+    const textBlock = json.content.find(block => block.type === 'text');
+    if (!textBlock) {
+      throw new Error("Claude returned no text content.");
     }
+
+    const estimatedFood = JSON.parse(textBlock.text);
 
     state.selectedFoodForLogging = estimatedFood;
-    
+
     document.getElementById('food-search-input').value = estimatedFood.name;
     document.getElementById('food-amount-input').value = estimatedFood.defaultServing;
-    document.getElementById('amount-unit-label').textContent = estimatedFood.unit;
-    
+    setSelectUnit(estimatedFood.unit);
+
     setManualNutrientEditMode(false);
     updateNutritionLogPreview();
-    
+
     document.getElementById('search-ai-action-row').classList.add('hidden');
-    
+
   } catch (err) {
-    console.error("Gemini estimation error:", err);
+    console.error("Claude estimation error:", err);
     alert(`AI failed to estimate. You can input the values manually by clicking the 'Edit Manually' button.\nError: ${err.message}`);
   } finally {
     hideLoader();
@@ -3191,7 +3196,7 @@ function setupEventHandlers() {
     });
   }
 
-  // Tooltip popup trigger for Gemini API key instructions
+  // Tooltip popup trigger for Claude API key instructions
   const tooltipTrigger = document.getElementById('api-key-help-btn');
   const tooltipContent = document.getElementById('api-key-help-tooltip');
   if (tooltipTrigger && tooltipContent) {
@@ -3361,17 +3366,17 @@ function setupEventHandlers() {
     profileDrawer.classList.remove('open');
   });
 
-  // Sync settings form submit (now saving the Gemini API Key too)
+  // Sync settings form submit (now saving the Claude API Key too)
   document.getElementById('sync-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const url = document.getElementById('apps-script-url').value.trim();
-    const geminiKey = document.getElementById('gemini-api-key').value.trim();
-    
+    const claudeKey = document.getElementById('claude-api-key').value.trim();
+
     state.scriptUrl = url;
     localStorage.setItem(KEYS.SCRIPT_URL, url);
 
-    state.geminiApiKey = geminiKey;
-    localStorage.setItem(KEYS.GEMINI_KEY, geminiKey);
+    state.claudeApiKey = claudeKey;
+    localStorage.setItem(KEYS.CLAUDE_KEY, claudeKey);
 
     showLoader("Syncing Database...");
     if (url) {
@@ -3400,7 +3405,7 @@ function setupEventHandlers() {
   document.getElementById('ask-ai-estimate-btn').addEventListener('click', () => {
     const query = document.getElementById('food-search-input').value.trim();
     if (query) {
-      fetchGeminiEstimate(query);
+      fetchClaudeEstimate(query);
     }
   });
 

@@ -507,21 +507,21 @@
 
           <div class="form-group">
             <div class="label-with-help">
-              <label for="gemini-api-key">Gemini API Key</label>
+              <label for="claude-api-key">Claude API Key</label>
               <div class="tooltip-container">
                 <button type="button" class="tooltip-trigger" id="api-key-help-btn" aria-label="API Key Help">?</button>
                 <div class="tooltip-content hidden" id="api-key-help-tooltip">
                   <h5>How to get your API Key:</h5>
                   <ol>
-                    <li>Go to <a href="https://aistudio.google.com/" target="_blank" rel="noopener">Google AI Studio</a>.</li>
-                    <li>Sign in with your Google account.</li>
-                    <li>Click <strong>Get API key</strong> and create a key.</li>
+                    <li>Go to <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic Console</a>.</li>
+                    <li>Sign in to your Anthropic account.</li>
+                    <li>Click <strong>Create Key</strong> and name it.</li>
                     <li>Copy the key and paste it in the field below.</li>
                   </ol>
                 </div>
               </div>
             </div>
-            <input type="password" id="gemini-api-key" placeholder="AIzaSy..." autocomplete="off">
+            <input type="password" id="claude-api-key" placeholder="sk-ant-..." autocomplete="off">
           </div>
 
           <div class="sync-status-card">
