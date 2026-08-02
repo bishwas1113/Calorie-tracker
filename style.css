@@ -1306,6 +1306,7 @@ input:focus, select:focus {
 .modal {
   width: 90%;
   max-width: 500px;
+  max-height: 90vh;
   background-color: var(--bg-color-card);
   border-radius: 20px;
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
@@ -1313,6 +1314,8 @@ input:focus, select:focus {
   transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
   overflow: hidden;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal::before {
@@ -1335,6 +1338,7 @@ input:focus, select:focus {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .modal-header h2 {
@@ -1345,6 +1349,9 @@ input:focus, select:focus {
 
 .modal-content {
   padding: 2rem;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .form-actions {
