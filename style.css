@@ -151,6 +151,17 @@ h1, h2, h3, h4 {
   transform: scale(0.95);
 }
 
+/* Filled primary variant, used for the quick "log food" header button */
+.filled-icon-btn {
+  background-color: var(--text-color-primary);
+  color: var(--bg-color-card);
+}
+
+.filled-icon-btn:hover {
+  background-color: var(--wood-dark);
+  color: var(--bg-color-card);
+}
+
 /* Utility buttons */
 .util-controls {
   display: flex;
@@ -228,6 +239,32 @@ h1, h2, h3, h4 {
 
   .text-icon-btn {
     padding: 0.4rem 0.7rem;
+  }
+}
+
+/* Extra-narrow phones (e.g. iPhone SE / 320px class devices) */
+@media (max-width: 360px) {
+  .util-controls {
+    gap: 0.4rem;
+  }
+
+  .icon-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  .date-display {
+    min-width: 68px;
+    font-size: 0.8rem;
+    padding: 0 0.25rem;
+  }
+
+  .date-selector-wrapper {
+    padding: 0.15rem 0.2rem;
+  }
+
+  .text-icon-btn {
+    padding: 0.35rem 0.5rem;
   }
 }
 

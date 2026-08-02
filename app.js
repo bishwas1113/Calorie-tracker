@@ -1,4 +1,4 @@
-// Komorebi Calorie Tracker - Frontend Application Logic
+// CaloLog - Frontend Application Logic
 
 // Local Storage Keys
 const KEYS = {
@@ -3227,7 +3227,7 @@ function setupEventHandlers() {
 
   // Add Food Modal
   const addModal = document.getElementById('add-food-modal-overlay');
-  document.getElementById('open-add-food-btn').addEventListener('click', () => {
+  const openAddFoodModal = () => {
     document.getElementById('add-food-form').reset();
     setSelectUnit('g');
     state.selectedFoodForLogging = null;
@@ -3240,7 +3240,9 @@ function setupEventHandlers() {
     renderQuickAddChips();
     addModal.classList.add('open');
     setTimeout(() => document.getElementById('food-search-input').focus(), 100);
-  });
+  };
+  document.getElementById('open-add-food-btn').addEventListener('click', openAddFoodModal);
+  document.getElementById('quick-add-food-btn').addEventListener('click', openAddFoodModal);
 
   // Favorite toggle (works for a selected DB food, or a manually-typed custom name)
   document.getElementById('toggle-favorite-btn').addEventListener('click', () => {
